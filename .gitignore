@@ -1,0 +1,35 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs & temp
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies (if you add Composer/npm later)
+/vendor/
+node_modules/
+
+# Build / release zips
+*.zip
+*.tar.gz
+
+# PHPUnit / static analysis caches
+.phpunit.result.cache
+.phpcs-cache
+phpstan.phar
+phpstan.neon.cache/
+
+# Local env / secrets (never commit)
+.env
+.env.*
+!.env.example
