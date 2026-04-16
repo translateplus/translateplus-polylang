@@ -4,8 +4,9 @@
  * Plugin URI:        https://translateplus.io/wordpress-polylang-integration
  * Description:       Translate WordPress content automatically using TranslatePlus. Integrates with Polylang to generate multilingual posts using a cost-optimized translation API (DeepL & Google alternative).
  * Version:           0.1.0
- * Requires at least: 6.0
+ * Requires at least: 6.5
  * Requires PHP:      7.4
+ * Requires Plugins: polylang
  * Author:            TranslatePlus
  * Author URI:        https://translateplus.io
  * License:           GPL-2.0-or-later
@@ -61,7 +62,6 @@ final class TranslatePlus_Polylang_Addon {
 		}
 
 		if ( ! self::deps_ok() ) {
-			add_action( 'admin_notices', array( __CLASS__, 'deps_notice' ) );
 			return;
 		}
 
@@ -74,28 +74,6 @@ final class TranslatePlus_Polylang_Addon {
 	private static function deps_ok(): bool {
 		$has_polylang     = function_exists( 'pll_languages_list' ) && function_exists( 'pll_get_post_language' ) && function_exists( 'pll_save_post_translations' );
 		return $has_polylang;
-	}
-
-	public static function deps_notice(): void {
-		if ( ! current_user_can( 'activate_plugins' ) ) {
-			return;
-		}
-
-		$missing = array();
-		if ( ! ( function_exists( 'pll_languages_list' ) && function_exists( 'pll_get_post_language' ) && function_exists( 'pll_save_post_translations' ) ) ) {
-			$missing[] = 'Polylang';
-		}
-
-		printf(
-			'<div class="notice notice-warning"><p>%s</p></div>',
-			esc_html(
-				sprintf(
-					/* translators: %s: comma-separated plugin names */
-					__( 'TranslatePlus for Polylang is currently inactive. Required plugin: %s.', 'translateplus-polylang-addon' ),
-					implode( ', ', $missing )
-				)
-			)
-		);
 	}
 
 	public static function register_metabox(): void {

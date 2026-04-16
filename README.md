@@ -12,7 +12,7 @@ TranslatePlus for Polylang adds a TranslatePlus-powered translation workflow to 
 
 ## Requirements
 
-- WordPress 6.0+
+- WordPress 6.5+ (uses core plugin dependencies for Polylang)
 - PHP 7.4+
 - Polylang plugin active
 - TranslatePlus API key

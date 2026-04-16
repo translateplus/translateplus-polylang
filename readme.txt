@@ -1,7 +1,7 @@
 === TranslatePlus for Polylang ===
 Contributors: translateplus
 Tags: translation, polylang, multilingual, ai translation, translation api
-Requires at least: 6.0
+Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 7.4
 Stable tag: 0.1.0
@@ -26,6 +26,7 @@ Features:
 
 Notes:
 
+* WordPress 6.5+ enforces the **Polylang** dependency (same as core “Requires Plugins”): activation is blocked until Polylang is installed and active.
 * This plugin requires Polylang to be active.
 * This plugin requires a TranslatePlus account and API key.
 
