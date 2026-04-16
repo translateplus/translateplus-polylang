@@ -83,9 +83,17 @@ final class TPPL_Settings {
 			'tppl-settings',
 			plugins_url( 'assets/tppl-settings.js', TRANSLATEPLUS_POLYLANG_ADDON_FILE ),
 			array( 'jquery' ),
-			'0.2.1',
+			'0.2.2',
 			true
 		);
+
+		$bulk_strings = array();
+		if ( class_exists( 'PLL_MO' ) && class_exists( 'TPPL_Translate_Helper' ) ) {
+			$bulk_strings = array(
+				'action' => TPPL_Translate_Helper::BULK_PLL_STRINGS_ACTION,
+				'nonce'  => wp_create_nonce( TPPL_Translate_Helper::BULK_PLL_STRINGS_ACTION ),
+			);
+		}
 
 		wp_localize_script(
 			'tppl-settings',
@@ -98,6 +106,7 @@ final class TPPL_Settings {
 				'saveNonce'        => wp_create_nonce( self::SAVE_API_KEY_ACTION ),
 				'disconnectAction' => self::DISCONNECT_ACTION,
 				'disconnectNonce'  => wp_create_nonce( self::DISCONNECT_ACTION ),
+				'bulkStrings'      => $bulk_strings,
 				'i18n'             => array(
 					'refreshing'        => __( 'Refreshing…', 'translateplus-polylang-addon' ),
 					'refresh'           => __( 'Refresh Status', 'translateplus-polylang-addon' ),
@@ -109,6 +118,10 @@ final class TPPL_Settings {
 					'disconnect'      => __( 'Disconnect Account', 'translateplus-polylang-addon' ),
 					'disconnectError' => __( 'Could not disconnect your account. Please try again.', 'translateplus-polylang-addon' ),
 					'disconnectConfirm' => __( 'Are you sure you want to disconnect TranslatePlus?', 'translateplus-polylang-addon' ),
+					'bulkStringsWorking' => __( 'Translating strings…', 'translateplus-polylang-addon' ),
+					'bulkStringsRun'     => __( 'Translate Polylang strings', 'translateplus-polylang-addon' ),
+					'bulkStringsError'   => __( 'Could not translate Polylang strings.', 'translateplus-polylang-addon' ),
+					'bulkStringsPick'    => __( 'Choose a language first.', 'translateplus-polylang-addon' ),
 				),
 			)
 		);
@@ -226,6 +239,12 @@ final class TPPL_Settings {
 		// Account status card
 		self::render_status_panel();
 
+		if ( self::has_api_key() && function_exists( 'pll_languages_list' ) && class_exists( 'PLL_MO' ) ) {
+			echo '<div class="tppl-card" id="tppl-polylang-bulk-card">';
+			self::render_polylang_strings_bulk_panel();
+			echo '</div>';
+		}
+
 		echo '</div>'; // .tppl-main
 
 		// ── Sidebar ───────────────────────────────────────────────────
@@ -314,6 +333,55 @@ final class TPPL_Settings {
 		echo '<div class="tppl-card" id="tppl-account-status-card">';
 		self::render_account_status_card_inner();
 		echo '</div>'; // #tppl-account-status-card
+	}
+
+	/**
+	 * Bulk Polylang string translations (Languages → String translations storage).
+	 */
+	private static function render_polylang_strings_bulk_panel(): void {
+		echo '<h2>' . esc_html__( 'Polylang strings', 'translateplus-polylang-addon' ) . '</h2>';
+		echo '<p class="tppl-subtle">'
+			. esc_html__(
+				'Send every string Polylang has stored for a language through TranslatePlus and save the results. Covers many widget texts and other registered strings. Navigation menus and arbitrary site options are not bulk-processed here.',
+				'translateplus-polylang-addon'
+			)
+			. '</p>';
+
+		$lang_map = array();
+		if ( function_exists( 'pll_the_languages' ) ) {
+			$raw = pll_the_languages( array( 'raw' => 1, 'hide_if_empty' => false ) );
+			if ( is_array( $raw ) ) {
+				foreach ( $raw as $row ) {
+					if ( ! is_array( $row ) || empty( $row['slug'] ) || ! is_string( $row['slug'] ) ) {
+						continue;
+					}
+					$slug            = $row['slug'];
+					$name            = isset( $row['name'] ) && is_string( $row['name'] ) ? $row['name'] : $slug;
+					$lang_map[ $slug ] = $name;
+				}
+			}
+		}
+
+		if ( count( $lang_map ) === 0 ) {
+			echo '<p class="tppl-subtle">' . esc_html__( 'No Polylang languages found.', 'translateplus-polylang-addon' ) . '</p>';
+			return;
+		}
+
+		echo '<p class="tppl-addon__row">';
+		echo '<label for="tppl-bulk-strings-lang">' . esc_html__( 'Language to update', 'translateplus-polylang-addon' ) . '</label><br />';
+		echo '<select id="tppl-bulk-strings-lang" class="widefat">';
+		echo '<option value="">' . esc_html__( 'Select language…', 'translateplus-polylang-addon' ) . '</option>';
+		foreach ( $lang_map as $slug => $name ) {
+			printf( '<option value="%s">%s</option>', esc_attr( $slug ), esc_html( $name ) );
+		}
+		echo '</select>';
+		echo '</p>';
+
+		printf(
+			'<p><button type="button" class="button button-primary" id="tppl-bulk-strings-btn">%s</button></p>',
+			esc_html__( 'Translate Polylang strings', 'translateplus-polylang-addon' )
+		);
+		echo '<p class="tppl-subtle" id="tppl-bulk-strings-status" style="display:none;" role="status"></p>';
 	}
 
 	/**

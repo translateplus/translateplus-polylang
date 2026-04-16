@@ -188,4 +188,74 @@
         setDisconnectBusy(false);
       });
   });
+
+  function setBulkStringsBusy(isBusy) {
+    var $btn = $("#tppl-bulk-strings-btn");
+    if (!$btn.length) {
+      return;
+    }
+    $btn.prop("disabled", isBusy);
+    $btn.text(
+      isBusy
+        ? TPPL_SETTINGS.i18n.bulkStringsWorking
+        : TPPL_SETTINGS.i18n.bulkStringsRun
+    );
+  }
+
+  function setBulkStringsStatus(msg) {
+    var $el = $("#tppl-bulk-strings-status");
+    if (!$el.length) {
+      return;
+    }
+    if (!msg) {
+      $el.hide().text("");
+      return;
+    }
+    $el.text(msg).show();
+  }
+
+  $(document).on("click", "#tppl-bulk-strings-btn", function () {
+    if (typeof TPPL_SETTINGS === "undefined") {
+      return;
+    }
+    if (
+      !TPPL_SETTINGS.bulkStrings ||
+      !TPPL_SETTINGS.bulkStrings.action ||
+      !TPPL_SETTINGS.bulkStrings.nonce
+    ) {
+      return;
+    }
+
+    var target = String($("#tppl-bulk-strings-lang").val() || "").trim();
+    if (!target) {
+      setBulkStringsStatus(TPPL_SETTINGS.i18n.bulkStringsPick);
+      return;
+    }
+
+    setBulkStringsStatus("");
+    setBulkStringsBusy(true);
+
+    $.post(TPPL_SETTINGS.ajaxUrl, {
+      action: TPPL_SETTINGS.bulkStrings.action,
+      nonce: TPPL_SETTINGS.bulkStrings.nonce,
+      target: target,
+    })
+      .done(function (resp) {
+        if (resp && resp.success && resp.data && resp.data.message) {
+          showPageNotice("success", resp.data.message);
+          setBulkStringsStatus("");
+          return;
+        }
+        var errMsg =
+          (resp && resp.data && resp.data.message) ||
+          TPPL_SETTINGS.i18n.bulkStringsError;
+        showPageNotice("error", errMsg);
+      })
+      .fail(function () {
+        showPageNotice("error", TPPL_SETTINGS.i18n.bulkStringsError);
+      })
+      .always(function () {
+        setBulkStringsBusy(false);
+      });
+  });
 })(jQuery);

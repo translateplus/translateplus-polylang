@@ -29,6 +29,7 @@ final class TranslatePlus_Polylang_Addon {
 		require_once __DIR__ . '/includes/class-tppl-settings.php';
 		require_once __DIR__ . '/includes/class-tppl-language.php';
 		require_once __DIR__ . '/includes/class-tppl-api-client.php';
+		require_once __DIR__ . '/includes/class-tppl-translate-helper.php';
 
 		TPPL_Settings::init();
 
@@ -67,6 +68,7 @@ final class TranslatePlus_Polylang_Addon {
 		add_action( 'add_meta_boxes', array( __CLASS__, 'register_metabox' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_' . self::AJAX_ACTION, array( __CLASS__, 'ajax_translate_post' ) );
+		add_action( 'wp_ajax_' . TPPL_Translate_Helper::BULK_PLL_STRINGS_ACTION, array( 'TPPL_Translate_Helper', 'ajax_bulk_pll_strings' ) );
 	}
 
 	private static function deps_ok(): bool {
@@ -308,23 +310,41 @@ final class TranslatePlus_Polylang_Addon {
 			wp_send_json_error( array( 'message' => $new_id->get_error_message() ) );
 		}
 
+		$new_id = (int) $new_id;
+
 		// Copy basic taxonomies to keep structure consistent.
 		$taxes = get_object_taxonomies( $post->post_type, 'names' );
 		foreach ( $taxes as $tax ) {
 			$terms = wp_get_object_terms( $post_id, $tax, array( 'fields' => 'ids' ) );
 			if ( ! is_wp_error( $terms ) ) {
-				wp_set_object_terms( (int) $new_id, $terms, $tax, false );
+				wp_set_object_terms( $new_id, $terms, $tax, false );
 			}
 		}
 
-		pll_set_post_language( (int) $new_id, $target );
+		/**
+		 * Whether to copy translated post meta, translated slug, and duplicated featured image after creating the draft.
+		 *
+		 * @param bool $enabled Default true.
+		 */
+		if ( apply_filters( 'tppl_translate_post_extended_enabled', true ) ) {
+			$meta_result = TPPL_Translate_Helper::copy_translated_post_meta( $post_id, $new_id, $source_api, $target_api );
+			if ( is_wp_error( $meta_result ) ) {
+				wp_delete_post( $new_id, true );
+				wp_send_json_error( array( 'message' => $meta_result->get_error_message() ) );
+			}
+
+			TPPL_Translate_Helper::duplicate_featured_image( $post_id, $new_id, $source_api, $target_api );
+			TPPL_Translate_Helper::set_unique_slug_from_title( $new_id, $title, $post->post_type, (int) $post->post_parent );
+		}
+
+		pll_set_post_language( $new_id, $target );
 
 		$translations            = is_array( $existing ) ? $existing : array();
 		$translations[ $source ] = $post_id;
-		$translations[ $target ] = (int) $new_id;
+		$translations[ $target ] = $new_id;
 		pll_save_post_translations( $translations );
 
-		$edit_url = get_edit_post_link( (int) $new_id, 'raw' );
+		$edit_url = get_edit_post_link( $new_id, 'raw' );
 		wp_send_json_success(
 			array(
 				'message' => __( 'Translation draft created.', 'translateplus-polylang-addon' ),
