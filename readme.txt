@@ -8,21 +8,41 @@ Stable tag: 0.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Translate WordPress posts with TranslatePlus API and create Polylang-linked draft translations in one click.
+Translate WordPress posts and related content with the TranslatePlus API, with Polylang-linked draft translations in one click.
 
 == Description ==
 
-TranslatePlus for Polylang adds a TranslatePlus-powered translation workflow to the post editor.
+TranslatePlus for Polylang adds a TranslatePlus-powered translation workflow to the post editor and optional bulk tools in Settings.
 
 After connecting your API key in Settings, editors can pick a target language in the TranslatePlus metabox and create a translated draft that is automatically linked by Polylang.
 
+= What this plugin translates =
+
+**From the post editor (“Translate with TranslatePlus”)** — creates a new **draft** in the target language and links it in Polylang. The following are sent to TranslatePlus and written into that draft where applicable:
+
+* **Post title** and **excerpt** (plain text, batch API)
+* **Post content** (HTML via the HTML translation endpoint; block markup and typical HTML in the editor are preserved as far as the API allows)
+* **Custom fields / post meta** — values are copied from the source post and translated recursively (strings and serialized PHP structures). Internal, technical, and Polylang keys are skipped (for example `_thumbnail_id`, locks, `_pll*`, many WooCommerce SKU/stock keys, and others). You can narrow this further with the `tppl_excluded_post_meta_keys` filter.
+* **URL slug** — `post_name` is generated from the **translated title** and made unique (`wp_unique_post_slug`).
+* **Featured image** — the file is copied to a new media library item; the attachment’s title, caption, description, and alt text are translated.
+
+**Taxonomies** — term IDs from the source post are attached to the new draft (same taxonomy structure). Term *names* are not automatically translated.
+
+**Settings → Polylang strings (optional)** — bulk-updates **Polylang string translations** stored for a chosen language (the same strings Polylang uses for many widgets and registered strings). This does **not** walk every navigation menu item or every arbitrary site option.
+
+**Not** translated automatically (out of scope for this plugin):
+
+* Navigation menus as a whole, arbitrary widgets/options, or SEO plugin fields unless they live in post content or in Polylang’s string storage as above.
+* Polylang “Strings” that are never registered in Polylang’s string storage.
+
 Features:
 
-* One-click translation draft creation from the post editor
+* One-click translation draft creation from the post editor (public post types)
 * Uses Polylang language mapping and translation linking
-* Translates post title, excerpt, and content via TranslatePlus API
+* Extended draft cloning: translated meta, slug, and duplicated featured image (can be disabled with the `tppl_translate_post_extended_enabled` filter)
+* Optional bulk Polylang string translation from Settings
 * Settings page with connection status and account metrics
-* AJAX-based API key validation and save flow
+* AJAX-based API key validation, save, and disconnect flows
 
 Notes:
 
@@ -50,7 +70,11 @@ Create an account at `https://app.translateplus.io` and copy your API key from t
 
 = What happens when I click “Translate with TranslatePlus”? =
 
-The plugin sends source content to TranslatePlus, creates a draft translation in the selected target language, and links it to the source post via Polylang.
+The plugin sends the source post’s translatable fields (title, excerpt, content, meta, etc.) to TranslatePlus, creates a **draft** in the selected target language, applies a translated slug and duplicated featured image when applicable, and links the new post to the source via Polylang’s translation group.
+
+= What does the plugin translate vs. not translate? =
+
+See **What this plugin translates** in the Description above. In short: post fields, HTML body, most post meta (with exclusions), slug, featured image media fields, and optional Polylang string packs. It does not replace a full site localization or menu builder workflow.
 
 == Screenshots ==
 
@@ -89,6 +113,7 @@ Data sent may include:
 
 * The API key you provide (in request header `X-API-KEY`)
 * Post title, excerpt, and content being translated
+* Post meta and other text fields included in translation or bulk string operations
 * Source and target language codes
 
 Data is sent only when you use plugin features (for example, saving API key, refreshing account status, or translating content).
