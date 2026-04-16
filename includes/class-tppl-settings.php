@@ -31,6 +31,7 @@ final class TPPL_Settings {
 		add_action( 'current_screen',         array( __CLASS__, 'suppress_default_wp_notices' ) );
 		add_action( 'wp_ajax_tppl_refresh_summary', array( __CLASS__, 'ajax_refresh_summary' ) );
 		add_action( 'wp_ajax_' . self::SAVE_API_KEY_ACTION, array( __CLASS__, 'ajax_save_api_key' ) );
+		add_action( 'wp_ajax_' . self::DISCONNECT_ACTION, array( __CLASS__, 'ajax_disconnect_account' ) );
 	}
 
 	/**
@@ -75,14 +76,14 @@ final class TPPL_Settings {
 			'tppl-settings',
 			plugins_url( 'assets/tppl-settings.css', TRANSLATEPLUS_POLYLANG_ADDON_FILE ),
 			array(),
-			'0.3.6'
+			'0.3.7'
 		);
 
 		wp_enqueue_script(
 			'tppl-settings',
 			plugins_url( 'assets/tppl-settings.js', TRANSLATEPLUS_POLYLANG_ADDON_FILE ),
 			array( 'jquery' ),
-			'0.2.0',
+			'0.2.1',
 			true
 		);
 
@@ -90,18 +91,24 @@ final class TPPL_Settings {
 			'tppl-settings',
 			'TPPL_SETTINGS',
 			array(
-				'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
-				'action'     => 'tppl_refresh_summary',
-				'nonce'      => wp_create_nonce( self::REFRESH_ACTION ),
-				'saveAction' => self::SAVE_API_KEY_ACTION,
-				'saveNonce'  => wp_create_nonce( self::SAVE_API_KEY_ACTION ),
-				'i18n'       => array(
-					'refreshing' => __( 'Refreshing…', 'translateplus-polylang-addon' ),
-					'refresh'    => __( 'Refresh Status', 'translateplus-polylang-addon' ),
-					'error'      => __( 'Unable to refresh status right now. Please try again.', 'translateplus-polylang-addon' ),
-					'saving'     => __( 'Saving…', 'translateplus-polylang-addon' ),
-					'save'       => __( 'Save & Connect', 'translateplus-polylang-addon' ),
-					'saveError'  => __( 'Could not save your API key. Please try again.', 'translateplus-polylang-addon' ),
+				'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
+				'action'           => 'tppl_refresh_summary',
+				'nonce'            => wp_create_nonce( self::REFRESH_ACTION ),
+				'saveAction'       => self::SAVE_API_KEY_ACTION,
+				'saveNonce'        => wp_create_nonce( self::SAVE_API_KEY_ACTION ),
+				'disconnectAction' => self::DISCONNECT_ACTION,
+				'disconnectNonce'  => wp_create_nonce( self::DISCONNECT_ACTION ),
+				'i18n'             => array(
+					'refreshing'        => __( 'Refreshing…', 'translateplus-polylang-addon' ),
+					'refresh'           => __( 'Refresh Status', 'translateplus-polylang-addon' ),
+					'error'             => __( 'Unable to refresh status right now. Please try again.', 'translateplus-polylang-addon' ),
+					'saving'            => __( 'Saving…', 'translateplus-polylang-addon' ),
+					'save'              => __( 'Save & Connect', 'translateplus-polylang-addon' ),
+					'saveError'         => __( 'Could not save your API key. Please try again.', 'translateplus-polylang-addon' ),
+					'disconnecting'   => __( 'Disconnecting…', 'translateplus-polylang-addon' ),
+					'disconnect'      => __( 'Disconnect Account', 'translateplus-polylang-addon' ),
+					'disconnectError' => __( 'Could not disconnect your account. Please try again.', 'translateplus-polylang-addon' ),
+					'disconnectConfirm' => __( 'Are you sure you want to disconnect TranslatePlus?', 'translateplus-polylang-addon' ),
 				),
 			)
 		);
@@ -169,7 +176,7 @@ final class TPPL_Settings {
 		echo wp_kses(
 			sprintf(
 				/* translators: %s: TranslatePlus app URL (create account / dashboard) */
-				__( 'Find your API key in your TranslatePlus dashboard. <a href="%s" target="_blank" rel="noopener noreferrer">Create account</a>.', 'translateplus-polylang-addon' ),
+				__( 'Find your API key in your TranslatePlus dashboard.', 'translateplus-polylang-addon' ),
 				esc_url( 'https://app.translateplus.io' )
 			),
 			array(
@@ -187,8 +194,6 @@ final class TPPL_Settings {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-
-		self::handle_disconnect_request();
 
 		echo '<div class="wrap tppl-wrap">';
 
@@ -227,11 +232,12 @@ final class TPPL_Settings {
 		echo '<aside class="tppl-sidebar">';
 		self::render_sidebar_signup_promo_card();
 		echo '<div class="tppl-card tppl-marketing-card">';
-		echo '<span class="tppl-badge">' . esc_html__( 'Powered by TranslatePlus', 'translateplus-polylang-addon' ) . '</span>';
+		
 		echo '<p class="tppl-hero__promo">' . esc_html__( 'Fast, accurate AI translation for websites and teams.', 'translateplus-polylang-addon' ) . '</p>';
 		echo '<a class="button button-primary tppl-hero__cta" href="https://translateplus.io" target="_blank" rel="noopener noreferrer">'
 			. esc_html__( 'Visit translateplus.io', 'translateplus-polylang-addon' )
 			. '</a>';
+			echo '<span class="tppl-badge">' . esc_html__( 'Powered by TranslatePlus', 'translateplus-polylang-addon' ) . '</span>';
 		echo '</div>';
 		echo '</aside>';
 
@@ -270,18 +276,14 @@ final class TPPL_Settings {
 		echo '<h2>' . esc_html__( 'Connection Settings', 'translateplus-polylang-addon' ) . '</h2>';
 
 		if ( self::has_api_key() ) {
-			echo '<form action="" method="post">';
-			wp_nonce_field( self::DISCONNECT_ACTION, '_tppl_disconnect_nonce' );
-			echo '<input type="hidden" name="tppl_action" value="disconnect" />';
+			echo '<form id="tppl-disconnect-form" method="post" action="">';
 			do_settings_sections( 'tppl-settings' );
 			submit_button(
 				__( 'Disconnect Account', 'translateplus-polylang-addon' ),
 				'delete',
 				'tppl_disconnect',
 				false,
-				array(
-					'onclick' => "return window.confirm('" . esc_js( __( 'Are you sure you want to disconnect TranslatePlus?', 'translateplus-polylang-addon' ) ) . "');",
-				)
+				array( 'id' => 'tppl-disconnect-submit' )
 			);
 			echo '</form>';
 			return;
@@ -520,6 +522,25 @@ final class TPPL_Settings {
 		) );
 	}
 
+	public static function ajax_disconnect_account(): void {
+		check_ajax_referer( self::DISCONNECT_ACTION, 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array(
+				'message' => __( 'You do not have permission to perform this action.', 'translateplus-polylang-addon' ),
+			) );
+		}
+
+		delete_option( self::OPTION_API_KEY );
+		TPPL_API_Client::clear_account_summary_cache();
+
+		wp_send_json_success( array(
+			'message'        => __( 'TranslatePlus account has been disconnected.', 'translateplus-polylang-addon' ),
+			'connectionHtml' => self::get_connection_card_inner_html(),
+			'accountHtml'    => self::get_account_status_card_inner_html(),
+		) );
+	}
+
 	/**
 	 * @return true|WP_Error
 	 */
@@ -537,25 +558,6 @@ final class TPPL_Settings {
 		}
 
 		return true;
-	}
-
-	private static function handle_disconnect_request(): void {
-		if ( ! isset( $_POST['tppl_action'] ) || 'disconnect' !== $_POST['tppl_action'] ) {
-			return;
-		}
-
-		$nonce = isset( $_POST['_tppl_disconnect_nonce'] ) && is_string( $_POST['_tppl_disconnect_nonce'] )
-			? $_POST['_tppl_disconnect_nonce']
-			: '';
-
-		if ( ! wp_verify_nonce( $nonce, self::DISCONNECT_ACTION ) ) {
-			return;
-		}
-
-		delete_option( self::OPTION_API_KEY );
-		TPPL_API_Client::clear_account_summary_cache();
-
-		self::set_notice( 'success', __( 'TranslatePlus account has been disconnected.', 'translateplus-polylang-addon' ) );
 	}
 
 	private static function mask_api_key( string $api_key ): string {

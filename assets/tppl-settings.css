@@ -52,9 +52,11 @@
 /* Between hero and two-column layout: plugin success/error only */
 .tppl-page-notices {
 	margin: 0 0 20px;
+	position: relative;
+	z-index: 2;
 }
 
-.tppl-page-notices:not(:has(.notice)) {
+.tppl-page-notices:empty {
 	display: none;
 	margin: 0;
 }
@@ -529,7 +531,7 @@
 	text-transform: uppercase;
 	border-radius: 99px;
 	padding: 4px 12px;
-	margin-bottom: 14px;
+	margin-top: 14px;
 }
 
 .tppl-hero__promo {
@@ -559,12 +561,9 @@
 	transform: translateY(-1px) !important;
 }
 
-/* ── Inline notices ──────────────────────────────────────── */
-.tppl-wrap .notice {
-	border-radius: var(--tppl-radius-sm);
-	margin-bottom: 20px;
+/* ── Inline notices (between hero and layout only) ───────── */
+.tppl-page-notices .notice {
 	border-left-width: 4px;
-	box-shadow: var(--tppl-shadow);
 }
 
 /* ── Responsive ──────────────────────────────────────────── */

@@ -60,6 +60,17 @@
     $btn.val(isBusy ? TPPL_SETTINGS.i18n.saving : TPPL_SETTINGS.i18n.save);
   }
 
+  function setDisconnectBusy(isBusy) {
+    var $btn = $("#tppl-disconnect-submit");
+    if (!$btn.length) {
+      return;
+    }
+    $btn.prop("disabled", isBusy);
+    $btn.val(
+      isBusy ? TPPL_SETTINGS.i18n.disconnecting : TPPL_SETTINGS.i18n.disconnect
+    );
+  }
+
   $(document).on("click", "#tppl-refresh-status", function () {
     if (typeof TPPL_SETTINGS === "undefined") {
       return;
@@ -130,6 +141,51 @@
       })
       .always(function () {
         setSaveBusy(false);
+      });
+  });
+
+  $(document).on("submit", "#tppl-disconnect-form", function (e) {
+    e.preventDefault();
+
+    if (typeof TPPL_SETTINGS === "undefined") {
+      return;
+    }
+
+    if (!window.confirm(TPPL_SETTINGS.i18n.disconnectConfirm)) {
+      return;
+    }
+
+    clearPageNotice();
+    setDisconnectBusy(true);
+
+    $.post(TPPL_SETTINGS.ajaxUrl, {
+      action: TPPL_SETTINGS.disconnectAction,
+      nonce: TPPL_SETTINGS.disconnectNonce,
+    })
+      .done(function (resp) {
+        if (resp && resp.success && resp.data) {
+          if (typeof resp.data.message === "string" && resp.data.message) {
+            showPageNotice("success", resp.data.message);
+          }
+          if (typeof resp.data.connectionHtml === "string") {
+            $("#tppl-connection-card").html(resp.data.connectionHtml);
+          }
+          if (typeof resp.data.accountHtml === "string") {
+            $("#tppl-account-status-card").html(resp.data.accountHtml);
+          }
+          return;
+        }
+
+        var errMsg =
+          (resp && resp.data && resp.data.message) ||
+          TPPL_SETTINGS.i18n.disconnectError;
+        showPageNotice("error", errMsg);
+      })
+      .fail(function () {
+        showPageNotice("error", TPPL_SETTINGS.i18n.disconnectError);
+      })
+      .always(function () {
+        setDisconnectBusy(false);
       });
   });
 })(jQuery);
