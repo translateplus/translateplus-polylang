@@ -83,7 +83,7 @@ final class TPPL_Settings {
 			'tppl-settings',
 			plugins_url( 'assets/tppl-settings.js', TRANSLATEPLUS_POLYLANG_ADDON_FILE ),
 			array( 'jquery' ),
-			'0.2.2',
+			'0.2.3',
 			true
 		);
 
@@ -342,7 +342,7 @@ final class TPPL_Settings {
 		echo '<h2>' . esc_html__( 'Polylang strings', 'translateplus-polylang-addon' ) . '</h2>';
 		echo '<p class="tppl-subtle">'
 			. esc_html__(
-				'Send every string Polylang has stored for a language through TranslatePlus and save the results. Covers many widget texts and other registered strings. Navigation menus and arbitrary site options are not bulk-processed here.',
+				'Fills Polylang string translations for a secondary language using msgids from the default language. Covers many widget texts and other registered strings. Pick a language other than the default. Navigation menus and arbitrary site options are not bulk-processed here.',
 				'translateplus-polylang-addon'
 			)
 			. '</p>';
@@ -367,11 +367,24 @@ final class TPPL_Settings {
 			return;
 		}
 
+		$default_slug = function_exists( 'pll_default_language' ) ? pll_default_language() : '';
+		$default_slug = is_string( $default_slug ) ? $default_slug : '';
+
+		$secondary_langs = $lang_map;
+		if ( '' !== $default_slug && isset( $secondary_langs[ $default_slug ] ) ) {
+			unset( $secondary_langs[ $default_slug ] );
+		}
+
+		if ( count( $secondary_langs ) === 0 ) {
+			echo '<p class="tppl-subtle">' . esc_html__( 'Add at least one language besides the default in Polylang, then choose it here to generate translations.', 'translateplus-polylang-addon' ) . '</p>';
+			return;
+		}
+
 		echo '<p class="tppl-addon__row">';
-		echo '<label for="tppl-bulk-strings-lang">' . esc_html__( 'Language to update', 'translateplus-polylang-addon' ) . '</label><br />';
+		echo '<label for="tppl-bulk-strings-lang">' . esc_html__( 'Language to fill translations for', 'translateplus-polylang-addon' ) . '</label><br />';
 		echo '<select id="tppl-bulk-strings-lang" class="widefat">';
 		echo '<option value="">' . esc_html__( 'Select language…', 'translateplus-polylang-addon' ) . '</option>';
-		foreach ( $lang_map as $slug => $name ) {
+		foreach ( $secondary_langs as $slug => $name ) {
 			printf( '<option value="%s">%s</option>', esc_attr( $slug ), esc_html( $name ) );
 		}
 		echo '</select>';

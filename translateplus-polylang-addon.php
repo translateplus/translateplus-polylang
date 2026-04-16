@@ -34,8 +34,21 @@ final class TranslatePlus_Polylang_Addon {
 
 		TPPL_Settings::init();
 
+		add_action( 'plugins_loaded', array( __CLASS__, 'register_ajax_hooks' ), 20 );
 		add_action( 'admin_init', array( __CLASS__, 'maybe_boot' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( __CLASS__, 'add_plugin_action_links' ) );
+	}
+
+	/**
+	 * Register AJAX handlers early so admin-ajax.php always has them (not only after admin_init).
+	 */
+	public static function register_ajax_hooks(): void {
+		if ( ! self::deps_ok() ) {
+			return;
+		}
+
+		add_action( 'wp_ajax_' . self::AJAX_ACTION, array( __CLASS__, 'ajax_translate_post' ) );
+		add_action( 'wp_ajax_' . TPPL_Translate_Helper::BULK_PLL_STRINGS_ACTION, array( 'TPPL_Translate_Helper', 'ajax_bulk_pll_strings' ) );
 	}
 
 	/**
@@ -67,8 +80,6 @@ final class TranslatePlus_Polylang_Addon {
 
 		add_action( 'add_meta_boxes', array( __CLASS__, 'register_metabox' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
-		add_action( 'wp_ajax_' . self::AJAX_ACTION, array( __CLASS__, 'ajax_translate_post' ) );
-		add_action( 'wp_ajax_' . TPPL_Translate_Helper::BULK_PLL_STRINGS_ACTION, array( 'TPPL_Translate_Helper', 'ajax_bulk_pll_strings' ) );
 	}
 
 	private static function deps_ok(): bool {

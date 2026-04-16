@@ -174,6 +174,24 @@ final class TPPL_Translate_Helper {
 		return (bool) apply_filters( 'tppl_skip_meta_string_translation', false, $value );
 	}
 
+	/**
+	 * Whether to skip a Polylang string msgid (looser than post meta; allows short labels like "Home").
+	 */
+	private static function should_skip_pll_msgid( string $value ): bool {
+		$t = trim( $value );
+		if ( '' === $t ) {
+			return true;
+		}
+		if ( preg_match( '/^[0-9]+$/', $t ) ) {
+			return true;
+		}
+		if ( preg_match( '#^https?://#i', $t ) ) {
+			return true;
+		}
+
+		return (bool) apply_filters( 'tppl_skip_pll_msgid', false, $value );
+	}
+
 	public static function set_unique_slug_from_title( int $post_id, string $translated_title, string $post_type, int $post_parent ): void {
 		$base = sanitize_title( $translated_title );
 		if ( '' === $base ) {
@@ -305,9 +323,67 @@ final class TPPL_Translate_Helper {
 	}
 
 	/**
+	 * Collect Polylang string msgids for a language from term meta (includes rows where translation is still empty).
+	 *
+	 * Polylang's PLL_MO::import_from_db() skips pairs with an empty msgstr, so we must read raw meta too.
+	 *
+	 * @param PLL_Language $pll_lang Language term object.
+	 * @return string[]
+	 */
+	private static function collect_pll_string_msgids_for_language( $pll_lang ): array {
+		$found = array();
+
+		$raw = get_term_meta( $pll_lang->term_id, '_pll_strings_translations', true );
+		if ( is_array( $raw ) ) {
+			foreach ( $raw as $msg ) {
+				if ( ! is_array( $msg ) || ! isset( $msg[0] ) || ! is_string( $msg[0] ) ) {
+					continue;
+				}
+				$s = $msg[0];
+				if ( '' === $s || self::should_skip_pll_msgid( $s ) ) {
+					continue;
+				}
+				if ( strlen( $s ) > 50000 ) {
+					continue;
+				}
+				$found[] = $s;
+			}
+		}
+
+		$mo = new PLL_MO();
+		$mo->import_from_db( $pll_lang );
+		foreach ( $mo->entries as $entry ) {
+			if ( ! is_object( $entry ) || ! isset( $entry->singular ) || ! is_string( $entry->singular ) ) {
+				continue;
+			}
+			$s = $entry->singular;
+			if ( '' === $s || self::should_skip_pll_msgid( $s ) ) {
+				continue;
+			}
+			if ( strlen( $s ) > 50000 ) {
+				continue;
+			}
+			$found[] = $s;
+		}
+
+		/**
+		 * Filter msgids before bulk translation (Polylang strings).
+		 *
+		 * @param string[]     $msgids   Unique source strings.
+		 * @param PLL_Language $pll_lang Language these were collected from.
+		 */
+		$found = apply_filters( 'tppl_pll_string_msgids', array_values( array_unique( $found ) ), $pll_lang );
+
+		return is_array( $found ) ? $found : array();
+	}
+
+	/**
 	 * Overwrite Polylang string translations for one language using TranslatePlus.
 	 *
-	 * @return array{updated:int,skipped:int}|WP_Error
+	 * Msgids are taken from the **default** language string storage (and MO), because non-default languages
+	 * often have no rows in term meta until translated — Polylang would otherwise import an empty MO.
+	 *
+	 * @return array{updated:int,skipped:int,empty?:bool}|WP_Error
 	 */
 	public static function bulk_translate_pll_strings_for_language( string $target_lang_slug, string $source_api, string $target_api ) {
 		if ( ! class_exists( 'PLL_MO' ) || ! function_exists( 'PLL' ) || ! is_object( PLL() ) || ! isset( PLL()->model ) ) {
@@ -319,30 +395,28 @@ final class TPPL_Translate_Helper {
 			return new WP_Error( 'tppl_pll_lang', __( 'Unknown Polylang language.', 'translateplus-polylang-addon' ) );
 		}
 
-		$mo = new PLL_MO();
-		$mo->import_from_db( $lang );
+		$default_slug = function_exists( 'pll_default_language' ) ? pll_default_language() : '';
+		$default_slug = is_string( $default_slug ) ? $default_slug : '';
 
-		$singulars = array();
-		foreach ( $mo->entries as $entry ) {
-			if ( ! is_object( $entry ) || ! isset( $entry->singular ) || ! is_string( $entry->singular ) ) {
-				continue;
-			}
-			$s = $entry->singular;
-			if ( '' === $s || self::should_skip_string_translation( $s ) ) {
-				continue;
-			}
-			if ( strlen( $s ) > 50000 ) {
-				continue;
-			}
-			$singulars[] = $s;
+		if ( '' !== $default_slug && $target_lang_slug === $default_slug ) {
+			return new WP_Error(
+				'tppl_pll_default_target',
+				__( 'Choose a language other than the default site language. This tool fills translations for secondary languages.', 'translateplus-polylang-addon' )
+			);
 		}
 
-		$singulars = array_values( array_unique( $singulars ) );
+		$source_lang = '' !== $default_slug ? PLL()->model->get_language( $default_slug ) : null;
+		if ( ! $source_lang ) {
+			return new WP_Error( 'tppl_pll_default', __( 'Could not resolve the default Polylang language.', 'translateplus-polylang-addon' ) );
+		}
+
+		$singulars = self::collect_pll_string_msgids_for_language( $source_lang );
 
 		if ( count( $singulars ) === 0 ) {
 			return array(
 				'updated' => 0,
 				'skipped' => 0,
+				'empty'   => true,
 			);
 		}
 
@@ -438,6 +512,17 @@ final class TPPL_Translate_Helper {
 		$result = self::bulk_translate_pll_strings_for_language( $target, $source_api, $target_api );
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+
+		if ( ! empty( $result['empty'] ) ) {
+			wp_send_json_success(
+				array(
+					'message' => __(
+						'No Polylang strings were found for the default language. Register strings under Languages → String translations, or browse the site so Polylang can register widget and theme strings, then try again.',
+						'translateplus-polylang-addon'
+					),
+				)
+			);
 		}
 
 		wp_send_json_success(
