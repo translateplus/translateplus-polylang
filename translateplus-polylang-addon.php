@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       TranslatePlus for Polylang – Translation API Integration
+ * Plugin Name:       TranslatePlus for Polylang
  * Plugin URI:        https://translateplus.io/wordpress-polylang-integration
  * Description:       Translate WordPress content automatically using TranslatePlus. Integrates with Polylang to generate multilingual posts using a cost-optimized translation API (DeepL & Google alternative).
  * Version:           0.1.0
@@ -33,6 +33,25 @@ final class TranslatePlus_Polylang_Addon {
 		TPPL_Settings::init();
 
 		add_action( 'admin_init', array( __CLASS__, 'maybe_boot' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( __CLASS__, 'add_plugin_action_links' ) );
+	}
+
+	/**
+	 * Add quick action links on the Plugins list.
+	 *
+	 * @param string[] $links Existing action links.
+	 * @return string[]
+	 */
+	public static function add_plugin_action_links( array $links ): array {
+		$settings_url = admin_url( 'options-general.php?page=tppl-settings' );
+		$settings_link = sprintf(
+			'<a href="%s">%s</a>',
+			esc_url( $settings_url ),
+			esc_html__( 'Settings', 'translateplus-polylang-addon' )
+		);
+
+		array_unshift( $links, $settings_link );
+		return $links;
 	}
 
 	public static function maybe_boot(): void {
