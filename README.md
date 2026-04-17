@@ -72,5 +72,5 @@ Data sent may include:
 
 For policy details:
 
-- Privacy: https://translateplus.io/privacy
-- Terms: https://translateplus.io/terms
+- Privacy: https://translateplus.io/privacy-policy
+- Terms: https://translateplus.io/terms-of-service
